@@ -208,28 +208,33 @@ func (f *FillPDF) AllButtonsTrue() map[string]bool {
 	return r
 }
 
-func (f *FillPDF) FillToFile(out string, textValues map[string]string, buttonValues map[string]bool) error {
+type FormData struct {
+	TextValues   map[string]string
+	ButtonValues map[string]bool
+}
+
+func (f *FillPDF) FillToFile(out string, data FormData, editable bool) error {
 	destFile, err := os.Create(out)
 	if err != nil {
 		return fmt.Errorf("cannot create file %s: %w", out, err)
 	}
 	defer destFile.Close()
 
-	return f.Fill(destFile, textValues, buttonValues)
+	return f.Fill(destFile, data, editable)
 }
 
-func (f *FillPDF) FillToBytes(textValues map[string]string, buttonValues map[string]bool) ([]byte, error) {
+func (f *FillPDF) FillToBytes(data FormData, editable bool) ([]byte, error) {
 	rs := &bytes.Buffer{}
 
-	if err := f.Fill(rs, textValues, buttonValues); err != nil {
+	if err := f.Fill(rs, data, editable); err != nil {
 		return nil, err
 	}
 
 	return rs.Bytes(), nil
 }
 
-func (f *FillPDF) Fill(out io.Writer, textValues map[string]string, buttonValues map[string]bool) error {
-	for k := range textValues {
+func (f *FillPDF) Fill(out io.Writer, data FormData, editable bool) error {
+	for k := range data.TextValues {
 		fi, ok := f.fields[k]
 		if !ok {
 			return fmt.Errorf("field %q is not in the form", k)
@@ -239,12 +244,28 @@ func (f *FillPDF) Fill(out io.Writer, textValues map[string]string, buttonValues
 		}
 	}
 
-	inbs, err := createXfdfFile(textValues, buttonValues)
+	for k := range data.ButtonValues {
+		fi, ok := f.fields[k]
+		if !ok {
+			return fmt.Errorf("field %q is not in the form", k)
+		}
+		if fi.Type != "Button" {
+			return fmt.Errorf("field %q is not Button, is %q", k, fi.Type)
+		}
+	}
+
+	inbs, err := createXfdfFile(data.TextValues, data.ButtonValues)
 	if err != nil {
 		return fmt.Errorf("cannot create FDF file: %w", err)
 	}
 
-	bs, err := runCommandInPathWithStdin(inbs, f.dir, f.e.java, "-jar", f.e.mcpdf, "input.pdf", "fill_form", "-", "output", "-")
+	args := []string{"-jar", f.e.mcpdf, "input.pdf", "flatten", "fill_form", "-", "output", "-"}
+
+	if editable {
+		args = []string{"-jar", f.e.mcpdf, "input.pdf", "fill_form", "-", "output", "-"}
+	}
+	
+	bs, err := runCommandInPathWithStdin(inbs, f.dir, f.e.java, args...)
 	if err != nil {
 		return fmt.Errorf("mcpdf error when trying to fill form: %w", err)
 	}

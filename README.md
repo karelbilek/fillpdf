@@ -56,12 +56,18 @@ Then, you fill the form with data. Note that text data and button data are separ
 Note, that all inputs are checked if they exist in the form and if they are the correct type.
 
 ```go
-err := fill.FillToFile("out_form.pdf", map[string]string{"foo": "bar"}, fill.AllButtonsTrue())
+err := fill.FillToFile("out_form.pdf", err = fill.FillToFile("bca_flat.pdf", fillpdf.FormData{
+   TextValues: map[string]string{"foo": "bar"},
+   ButtonValues: fill.AllButtonsTrue(),
+}, false)
 if err != nil {
 	// handle error
 	panic(err)
 }
 ```
+
+The `editable` value is important; with the value, the PDF is still editable by user; but, it can produce subtle errors
+on some viewers (Apple Preview, pdfjs) in some cases.
 
 You can call `FillToFile`, `FillToBytes` or just `Fill` to any io.writer.
 

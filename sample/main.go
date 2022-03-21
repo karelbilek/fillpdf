@@ -24,7 +24,10 @@ func main() {
 		mp[k] = mp[k] + " čřžů" // to test unicode
 	}
 
-	err = fill.FillToFile("out_form.pdf", mp, fill.AllButtonsTrue())
+	err = fill.FillToFile("form_out_flat.pdf", fillpdf.FormData{
+		TextValues:   mp,
+		ButtonValues: fill.AllButtonsTrue(),
+	}, false)
 	if err != nil {
 		panic(err)
 	}
