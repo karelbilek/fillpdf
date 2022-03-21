@@ -3,48 +3,79 @@
 FillPDF is a golang library to easily fill PDF forms. This library uses the pdftk utility to fill the PDF forms with fdf data.
 Currently this library only supports PDF text field values. Feel free to add support to more form types.
 
-
-## Documentation 
-
-Check the Documentation at [GoDoc.org](https://godoc.org/github.com/desertbit/fillpdf).
+This repo is cloned from https://github.com/desertbit/fillpdf, but changed the API
 
 ## Requirements
 
-FillPDF, under the hood, leverages the toolchain provided by PDFtk. Windows and Mac users need to install this dependency separately, the pdftk-sever executable is available [here](https://www.pdflabs.com/tools/pdftk-server/). After the installation is complete ensure that the install directory has been added to the system PATH (should be added automatically during the installation process).
+FillPDF needs 3 different things.
+* we need pdftk tool installed
+* we need java standalone binary (that should be installed together with pdftk)
+* we need tool called mcpdf from here - https://github.com/m-click/mcpdf - download link here - https://oss.sonatype.org/content/repositories/releases/aero/m-click/mcpdf/0.2.4/mcpdf-0.2.4-jar-with-dependencies.jar
 
-
-## Sample
-
-There is an example in the sample directory:
+## Guide
+First, you need to create an executor, with paths to the 3 pre-requisities mentioned above.
 
 ```go
-package main
-
-import (
-	"log"
-
-	"github.com/desertbit/fillpdf"
-)
-
-func main() {
-	// Create the form values.
-	form := fillpdf.Form{
-		"field_1": "Hello",
-		"field_2": "World",
+	executor, err := fillpdf.NewExecutor(fillpdf.Config{
+		Java:  "java",
+		PDFTk: "pdftk",
+		McPDF: "/Users/karelbilek/Downloads/mcpdf-0.2.4-jar-with-dependencies.jar",
+	})
+	if executor != nil {
+		panic(err)
 	}
+```
 
-	// Fill the form PDF with our values.
-	err := fillpdf.Fill(form, "form.pdf", "filled.pdf", true)
-	if err != nil {
-		log.Fatal(err)
-	}
+Then, you need to load the source PDF. Either from file, from bytes, or any reader.
+
+```go
+fill, cleanup, err := executor.CreateFromFile("form.pdf")
+if err != nil {
+    panic(err)
+}
+defer cleanup()
+
+// or, for example with embedded PDF
+
+// go:embed input.pdf
+var input []bytes
+
+// ...
+
+fill, cleanup, err := executor.CreateFromBytes(input)
+if err != nil {
+    panic(err)
+}
+defer cleanup()
+```
+
+Note:
+* you can reuse the same `fill` in whole program; `Fill` is concurrency-safe, you can call it concurrently and many times
+* call `cleanup` only when you no longer need `fill`, as it will delete the temporary directory
+
+Then, you fill the form with data. Note that text data and button data are separate. Currently, this library does not support more.
+
+Note, that all inputs are checked if they exist in the form and if they are the correct type.
+
+```go
+err := fill.FillToFile("out_form.pdf", map[string]string{"foo": "bar"}, fill.AllButtonsTrue())
+if err != nil {
+	// handle error
+	panic(err)
 }
 ```
 
-Run the example as following:
+You can call `FillToFile`, `FillToBytes` or just `Fill` to any io.writer.
 
-```
-cd sample
-go build
-./sample
-```
+There are helper functions `fill.DefaultTextValues` that will fill all fields to its name, so you can save
+the form and see which field is which. Also `fill.AllButtonsTrue()` that will fill all buttons to true.
+
+There is an example in the sample directory.
+
+## License
+
+Apache 2.0
+(C) Roland Singer <roland.singer@desertbit.com>
+(C) 2022 Karel Bilek <kb@karelbilek.com>
+
+Note, however, that pdftk is GPL and mcpdf is Affero GPL.
