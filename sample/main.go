@@ -7,10 +7,9 @@ import (
 func main() {
 	executor, err := fillpdf.NewExecutor(fillpdf.Config{
 		Java:  "java",
-		PDFTk: "pdftk",
 		McPDF: "/Users/karelbilek/Downloads/mcpdf-0.2.4-jar-with-dependencies.jar",
 	})
-	if executor != nil {
+	if err != nil {
 		panic(err)
 	}
 

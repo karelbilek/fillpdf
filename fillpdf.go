@@ -29,23 +29,21 @@ import (
 	"os"
 	"os/exec"
 	"path"
+
+	"github.com/ledongthuc/pdf"
 )
 
 type Config struct {
 	Java  string
-	PDFTk string
 	McPDF string
 }
 
 type Executor struct {
-	java, pdftk, mcpdf string
+	java, mcpdf string
 }
 
 func NewExecutor(config Config) (*Executor, error) {
-	pdftk, java, mcpdf := config.PDFTk, config.Java, config.McPDF
-	if _, err := exec.LookPath(pdftk); err != nil {
-		return nil, fmt.Errorf("pdftk utility is not installed at %q: %w", pdftk, err)
-	}
+	java, mcpdf := config.Java, config.McPDF
 
 	if _, err := exec.LookPath(java); err != nil {
 		return nil, fmt.Errorf("pdftk utility is not installed at %q: %w", java, err)
@@ -70,7 +68,6 @@ func NewExecutor(config Config) (*Executor, error) {
 
 	return &Executor{
 		java:  java,
-		pdftk: pdftk,
 		mcpdf: mcpdf,
 	}, nil
 }
@@ -79,48 +76,13 @@ type FillPDF struct {
 	dir         string
 	fieldsNames []string
 	fields      map[string]FormField
-	e           Executor
+	e           *Executor
 }
 
 type FormField struct {
 	Name         string
 	Type         string
 	CurrentValue string
-}
-
-func parseFormField(output []byte) ([]FormField, error) {
-	parts := bytes.Split(output, []byte("\n---\n"))
-	if len(parts) > 0 {
-		parts[0] = bytes.TrimPrefix(parts[0], []byte("---\n"))
-	}
-
-	fields := make([]FormField, 0, len(parts))
-
-	for _, p := range parts {
-		field := FormField{}
-		p = bytes.TrimRight(p, "\n")
-		lines := bytes.Split(p, []byte{'\n'})
-		for _, l := range lines {
-			spl := bytes.SplitN(l, []byte(": "), 2)
-			if len(spl) != 2 {
-				return nil, fmt.Errorf("cannot parse form field: %q", l)
-			}
-
-			typ, str := string(spl[0]), string(spl[1])
-
-			switch typ {
-			case "FieldType":
-				field.Type = html.UnescapeString(str)
-			case "FieldName":
-				field.Name = html.UnescapeString(str)
-			case "FieldValue":
-				field.CurrentValue = html.UnescapeString(str)
-			}
-		}
-		fields = append(fields, field)
-	}
-
-	return fields, nil
 }
 
 func (e *Executor) CreateFromFile(path string) (res *FillPDF, retCleanup func(), retErr error) {
@@ -167,12 +129,39 @@ func (e *Executor) Create(input io.Reader) (res *FillPDF, retCleanup func(), ret
 		return nil, nil, fmt.Errorf("cannot copy to file %s: %w", newFile, err)
 	}
 
-	fieldsBytes, err := runCommandInPath(newDir, e.pdftk, "input.pdf", "dump_data_fields")
+	_, r, err := pdf.Open(newFile)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pdftk error when trying to dump fields %s: %w", newFile, err)
+		panic(err)
 	}
 
-	fields, err := parseFormField(fieldsBytes)
+	pfields := r.Trailer().Key("Root").Key("AcroForm").Key("Fields")
+
+	fields := make([]FormField, 0, pfields.Len())
+
+	for i := 0; i < pfields.Len(); i++ {
+		pfield := pfields.Index(i)
+
+		t := pfield.Key("T")
+		name := t.RawString()
+
+		tp := pfield.Key("FT")
+		kind := ""
+		if tp.String() == "/Tx" {
+			kind = "Text"
+		}
+		if tp.String() == "/Btn" {
+			kind = "Button"
+		}
+
+		v := pfield.Key("V")
+		if kind != "" {
+			fields = append(fields, FormField{
+				Name:         name,
+				Type:         kind,
+				CurrentValue: v.RawString(),
+			})
+		}
+	}
 
 	names := make([]string, 0, len(fields))
 	m := make(map[string]FormField, len(fields))
@@ -185,6 +174,7 @@ func (e *Executor) Create(input io.Reader) (res *FillPDF, retCleanup func(), ret
 		dir:         newDir,
 		fieldsNames: names,
 		fields:      m,
+		e:           e,
 	}, cleanup, nil
 }
 

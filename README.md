@@ -7,18 +7,16 @@ This repo is cloned from https://github.com/desertbit/fillpdf, but changed the A
 
 ## Requirements
 
-FillPDF needs 3 different things.
-* we need pdftk tool installed
-* we need java standalone binary (that should be installed together with pdftk)
+FillPDF needs 2 different things.
+* we need java standalone binary
 * we need tool called mcpdf from here - https://github.com/m-click/mcpdf - download link here - https://oss.sonatype.org/content/repositories/releases/aero/m-click/mcpdf/0.2.4/mcpdf-0.2.4-jar-with-dependencies.jar
 
 ## Guide
-First, you need to create an executor, with paths to the 3 pre-requisities mentioned above.
+First, you need to create an executor, with paths to the 2 pre-requisities mentioned above.
 
 ```go
 	executor, err := fillpdf.NewExecutor(fillpdf.Config{
 		Java:  "java",
-		PDFTk: "pdftk",
 		McPDF: "/Users/karelbilek/Downloads/mcpdf-0.2.4-jar-with-dependencies.jar",
 	})
 	if executor != nil {
@@ -75,7 +73,9 @@ There is an example in the sample directory.
 ## License
 
 Apache 2.0
+
 (C) Roland Singer <roland.singer@desertbit.com>
+
 (C) 2022 Karel Bilek <kb@karelbilek.com>
 
-Note, however, that pdftk is GPL and mcpdf is Affero GPL.
+Note, however, that mcpdf is Affero GPL.
