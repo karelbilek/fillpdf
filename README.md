@@ -56,7 +56,7 @@ Then, you fill the form with data. Note that text data and button data are separ
 Note, that all inputs are checked if they exist in the form and if they are the correct type.
 
 ```go
-err := fill.FillToFile("out_form.pdf", err = fill.FillToFile("bca_flat.pdf", fillpdf.FormData{
+err := fill.FillToFile("out_form.pdf", err = fillpdf.FormData{
    TextValues: map[string]string{"foo": "bar"},
    ButtonValues: fill.AllButtonsTrue(),
 }, false)
